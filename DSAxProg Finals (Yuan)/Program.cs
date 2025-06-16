@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -25,10 +25,13 @@ namespace DSAxProgrammingFinals
 
             int atmCash = 0; // initial ATM cash amount ( set to 0 first)
 
-            double[] userLoanAmounts = new double[100];
-                                        int[] userLoanTerms = new int[100];
-                                        bool[] userHasActiveLoan = new bool[100];
-                                        DateTime[] userLoanStartDates = new DateTime[100];
+            double[] userLoanAmounts = new double[100]; // to store loan amounts for each user (up to 100 users just fixed)
+
+            int[] userLoanTerms = new int[100]; // to store loan terms (in months) for each user (up to 100 users just fixed)
+
+            bool[] userHasActiveLoan = new bool[100]; // to store  if there are active loan terms (up to 100 users just fixed)
+
+            DateTime[] userLoanStartDates = new DateTime[100]; // to store loan start dates for each user (up to 100 users just fixed)
 
             //-----LIST USED-----  
 
@@ -211,8 +214,6 @@ namespace DSAxProgrammingFinals
             if (!File.Exists(balanceData))
             {
                 File.Create(balanceData).Close();
-
-
             }
 
             else if (File.Exists(balanceData))
@@ -227,9 +228,12 @@ namespace DSAxProgrammingFinals
                     int existingIndex = accountNumbers.IndexOf(acct);
                     if (existingIndex != -1)
                     {
-                        // Ensure balances list is aligned in size
-                        while (balances.Count <= existingIndex)
-                            balances.Add(0);
+                        // After loading accountNumbers, ensure balances has the same count
+                        while (balances.Count < accountNumbers.Count)
+                        {
+                            balances.Add(0); // or any default initial value
+                        }
+
 
                         balances[existingIndex] = balance;
                     }
@@ -1615,12 +1619,7 @@ namespace DSAxProgrammingFinals
                                         Console.WriteLine("\nPress any key to return...");
                                         Console.ReadKey();
                                         break;
-
-
-                              
-
-
-
+                   
                                     case 9: // Contact Admin
                                         Console.Clear();
                                         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -1816,7 +1815,23 @@ namespace DSAxProgrammingFinals
 
                                                     if (newPin.Length == 4 && newPin.All(char.IsDigit))
                                                     {
-                                                        string newAccountNumber = $"{10000001 + accountNames.Count}";
+                                                        int highestAccountNumber = 10000000; // base
+
+                                                        for (int i = 0; i < accountNumbers.Count; i++) // maintain order when adding account
+                                                        {
+                                                            int accNum;
+
+                                                            if (int.TryParse(accountNumbers[i], out accNum))
+                                                            {
+                                                                if (accNum > highestAccountNumber)
+                                                                {
+                                                                    highestAccountNumber = accNum;
+                                                                }
+                                                            }
+                                                        }
+                                                        string newAccountNumber = "" + (highestAccountNumber + 1);
+
+
 
                                                         accountNames.Add(newUserName);
                                                         accountNumbers.Add(newAccountNumber);
@@ -1855,6 +1870,18 @@ namespace DSAxProgrammingFinals
                                                         Console.WriteLine($"Name: {newUserName}");
                                                         Console.WriteLine($"Account Number: {newAccountNumber}");
                                                         Console.WriteLine($"Initial Balance: PHP {initialBalance:F2}");
+
+                                                        balances.Add(initialBalance);
+
+                                                        // Automatically update bill counts from initial balance
+                                                        int tempBalance = (int)initialBalance;
+                                                        for (int i = 0; i < billDenominations.Length; i++)
+                                                        {
+                                                            int count = tempBalance / billDenominations[i];
+                                                            billCounts[i] += count;
+                                                            tempBalance %= billDenominations[i]; // use modulo to break down the bill denomination accurately
+                                                        }
+
                                                     }
                                                     else
                                                     {
@@ -1899,6 +1926,9 @@ namespace DSAxProgrammingFinals
                                                 {
                                                     Console.ForegroundColor = ConsoleColor.Red;
 
+                                                    // Get balance before removing it from the list
+                                                    int tempBalance = (int)balances[deleteIndex]; // Get deleted user's balance
+
                                                     // Remove from in-memory lists
                                                     accountNames.RemoveAt(deleteIndex);
                                                     accountNumbers.RemoveAt(deleteIndex);
@@ -1907,6 +1937,17 @@ namespace DSAxProgrammingFinals
                                                     accountStatus.RemoveAt(deleteIndex);
                                                     lockedAccount.Remove(accountToDelete);
 
+                                                    // Automatically deduct bill counts from deleted user's balance
+                                                    for (int i = 0; i < billDenominations.Length; i++)
+                                                    {
+                                                        int count = tempBalance / billDenominations[i];
+                                                        billCounts[i] -= count;
+                                                        tempBalance %= billDenominations[i]; // use modulo to break down the bill denomination accurately
+                                                    }
+
+
+
+                                                    string accountFile = Path.Combine(mainDirectory, "account.csv");
 
                                                     // Rebuild the file content
                                                     List<string> updatedAccounts = new List<string>();
@@ -1922,8 +1963,11 @@ namespace DSAxProgrammingFinals
                                                             status = "false";
                                                         }
 
-                                                        updatedAccounts.Add($"{accountNumbers[i]},{accountNames[i]},{pins[i]},{status}");
+                                                        updatedAccounts.Add(accountNumbers[i] + "," + accountNames[i] + "," + pins[i] + "," + status);
                                                     }
+
+                                                
+                                                    File.WriteAllLines(accountFile, updatedAccounts);
 
                                                     string cardFile = Path.Combine(mainDirectory, "card_input.txt");
 
@@ -1937,7 +1981,7 @@ namespace DSAxProgrammingFinals
                                                             updatedCards.Add(line);
                                                         }
                                                     }
-                                                    File.WriteAllLines(cardFile, updatedCards); // cardFile should be your "card_input.txt" full path
+                                                    File.WriteAllLines(cardFile, updatedCards); 
 
 
                                                     Console.WriteLine("\nUser deleted successfully.");
@@ -2265,7 +2309,20 @@ namespace DSAxProgrammingFinals
                                                         Console.WriteLine($"\nFrom: {userMessageNames[i]} ({userMessageAccounts[i]})");
                                                         Console.WriteLine($"\nSent: {userMessageTimes[i]}");
                                                         Console.WriteLine($"\nMessage: {userMessages[i]}");
-                                                        Console.WriteLine($"\nAdmin Reply: {(hasAdminReply[i] ? adminReplies[i] : "No reply yet")}");
+                                                        Console.WriteLine($"\nAdmin Reply: ");
+
+                                                            if (hasAdminReply[i])
+                                                            {
+                                                            // show the reply
+                                                            }
+                                                            else if (hasAdminReply[i])
+                                                            {
+                                                            Console.WriteLine("\nNo reply yet");
+                                                            }
+
+
+
+
                                                     }
                                                 }
                                                 else
